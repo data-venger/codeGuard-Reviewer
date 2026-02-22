@@ -24,6 +24,7 @@ from app.components import (
     render_review_metadata,
     render_verdict_badge,
 )
+from app.chat_tab import render_chat
 from codeguard.github_client import GitHubClient
 from codeguard.llm_client import OllamaClient
 from codeguard.review_engine import ReviewEngine
@@ -158,8 +159,8 @@ with st.sidebar:
 st.markdown('<h1 class="review-header">Pull Request Review</h1>', unsafe_allow_html=True)
 st.caption(f"Repository: **{github_org}/{github_repo}**" if github_org and github_repo else "Configure a repository in the sidebar →")
 
-# ── PR Browser Tab / Review Tab ──
-tab_browse, tab_review = st.tabs(["📋 Browse PRs", "🔍 Review"])
+# ── PR Browser Tab / Review Tab / Chat Tab ──
+tab_browse, tab_review, tab_chat = st.tabs(["📋 Browse PRs", "🔍 Review", "💬 Chat"])
 
 with tab_browse:
     if not github_org or not github_repo:
@@ -305,3 +306,7 @@ with tab_review:
                     st.session_state.selected_pr = None
                     st.session_state.review_result = None
                     st.rerun()
+
+
+with tab_chat:
+    render_chat(model_name=model_name)

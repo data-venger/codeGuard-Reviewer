@@ -164,12 +164,12 @@ class QdrantManager:
             ]
             qdrant_filter = models.Filter(must=must_clauses)
 
-        results = self.client.search(
+        results = self.client.query_points(
             collection_name=collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             limit=top_k,
             query_filter=qdrant_filter,
-        )
+        ).points
 
         return [
             {
