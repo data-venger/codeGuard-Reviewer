@@ -20,6 +20,12 @@ from rich.console import Console
 from codeguard.github_client import GitHubClient
 from codeguard.llm_client import OllamaClient
 from codeguard.retriever import Retriever, ReviewContext
+from codeguard.scorecard import (
+    SCORECARD_INSTRUCTION,
+    ReviewScorecard,
+    parse_scorecard,
+    strip_scorecard_json,
+)
 from config.settings import settings
 
 console = Console()
@@ -61,7 +67,8 @@ Based on the context above, provide a structured code review:
 
 End with a **Verdict**: one of APPROVED ✅, CHANGES_REQUESTED ⚠️, or ISSUES_FOUND ❌.
 
-Format your response in clear Markdown with headers for each section."""
+Format your response in clear Markdown with headers for each section.
+{scorecard_instruction}"""
 
 
 @dataclass
@@ -71,6 +78,9 @@ class ReviewResult:
     # Core output
     review_markdown: str = ""
     verdict: str = ""  # APPROVED, CHANGES_REQUESTED, ISSUES_FOUND
+
+    # Scorecard
+    scorecard: Optional[ReviewScorecard] = None
 
     # Metadata
     pr_number: int = 0
@@ -224,6 +234,7 @@ class ReviewEngine:
             adr_context=context.adr_context,
             history_context=context.history_context,
             diff=trimmed_diff,
+            scorecard_instruction=SCORECARD_INSTRUCTION,
         )
 
         # Step 5: Call LLM
@@ -235,9 +246,14 @@ class ReviewEngine:
             stream=False,
         )
 
-        result.review_markdown = review_text
+        # Parse scorecard from review
+        result.scorecard = parse_scorecard(review_text)
+        result.review_markdown = strip_scorecard_json(review_text)
         result.verdict = _extract_verdict(review_text)
         result.duration_seconds = time.time() - start_time
+
+        # Store review in Qdrant history
+        self._store_review(result)
 
         console.print(f"  [green]✓ Review complete in {result.duration_seconds:.1f}s[/green]")
         return result
@@ -296,6 +312,7 @@ class ReviewEngine:
             adr_context=context.adr_context,
             history_context=context.history_context,
             diff=trimmed_diff,
+            scorecard_instruction=SCORECARD_INSTRUCTION,
         )
 
         # Step 5: Stream LLM response
@@ -310,8 +327,58 @@ class ReviewEngine:
             full_response.append(token)
             yield token
 
-        result.review_markdown = "".join(full_response)
-        result.verdict = _extract_verdict(result.review_markdown)
+        raw_text = "".join(full_response)
+        result.scorecard = parse_scorecard(raw_text)
+        result.review_markdown = strip_scorecard_json(raw_text)
+        result.verdict = _extract_verdict(raw_text)
         result.duration_seconds = time.time() - start_time
 
+        # Store review in Qdrant history
+        self._store_review(result)
+
         return result
+
+    def _store_review(self, result: ReviewResult) -> None:
+        """Store completed review in Qdrant history collection for future reference."""
+        try:
+            from codeguard.embeddings import EmbeddingEngine
+            from codeguard.qdrant_store import QdrantManager
+
+            embedder = EmbeddingEngine()
+            qdrant = QdrantManager()
+
+            # Build a summary text for embedding
+            summary = (
+                f"PR #{result.pr_number} in {result.repo}: {result.pr_title}\n"
+                f"Author: {result.pr_author} | Branch: {result.branch}\n"
+                f"Verdict: {result.verdict}\n"
+                f"{result.review_markdown[:1000]}"
+            )
+
+            vectors = embedder.embed([summary])
+
+            metadata = {
+                "type": "review",
+                "pr_number": result.pr_number,
+                "repo": result.repo,
+                "pr_title": result.pr_title,
+                "author": result.pr_author,
+                "verdict": result.verdict,
+                "model": result.model_used,
+            }
+
+            if result.scorecard:
+                metadata["code_quality"] = result.scorecard.code_quality
+                metadata["standards_compliance"] = result.scorecard.standards_compliance
+                metadata["merge_recommendation"] = result.scorecard.merge_recommendation
+
+            qdrant.upsert_points(
+                collection_name="history",
+                texts=[summary],
+                vectors=vectors,
+                metadata=[metadata],
+            )
+            console.print("  [dim]📦 Review stored in history collection[/dim]")
+
+        except Exception as e:
+            console.print(f"  [yellow]⚠ Failed to store review: {e}[/yellow]")

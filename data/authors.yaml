@@ -1,22 +1,7 @@
-authors:
-  - github_handle: "alice-dev"
-    level: "junior"
-    team: "mobile-app"
-    modules:
-      - "user-profile"
-      - "notifications"
-
-  - github_handle: "bob-engineer"
+  - github_handle: "data-engineer"
     level: "senior"
     team: "platform"
     modules:
-      - "auth-service"
-      - "api-gateway"
       - "data-pipeline"
 
-  - github_handle: "charlie-fullstack"
-    level: "mid"
-    team: "web-frontend"
-    modules:
-      - "dashboard"
-      - "settings-page"
+
