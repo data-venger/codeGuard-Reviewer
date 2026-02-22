@@ -25,6 +25,7 @@ from app.components import (
     render_verdict_badge,
 )
 from app.chat_tab import render_chat
+from app.scorecard_ui import render_scorecard
 from codeguard.github_client import GitHubClient
 from codeguard.llm_client import OllamaClient
 from codeguard.review_engine import ReviewEngine
@@ -284,6 +285,12 @@ with tab_review:
             )
 
             st.divider()
+
+            # Scorecard (Phase 4)
+            if result.scorecard:
+                st.subheader("📊 Review Scorecard")
+                render_scorecard(result.scorecard)
+                st.divider()
 
             # Verdict + Review
             render_review(result.review_markdown, result.verdict)
