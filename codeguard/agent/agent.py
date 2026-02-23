@@ -133,22 +133,36 @@ def _extract_search_query(query: str) -> str:
 
 
 def create_agent(
-    model: str = "qwen2.5-coder:7b-instruct-q4_K_M",
+    model: str = "",
     temperature: float = 0.1,
 ):
-    """Create a ChatOllama instance for response synthesis."""
-    llm = ChatOllama(
-        model=model,
-        temperature=temperature,
-        num_ctx=8192,
-    )
-    return llm
+    """
+    Create a chat LLM instance for response synthesis.
+
+    Auto-detects provider: uses ChatGroq if GROQ_API_KEY is set,
+    otherwise falls back to ChatOllama.
+    """
+    provider = settings.llm_provider.lower()
+
+    if provider == "groq" or (settings.groq_api_key and provider != "ollama"):
+        from langchain_groq import ChatGroq
+        return ChatGroq(
+            model=model or settings.groq_model,
+            temperature=temperature,
+            api_key=settings.groq_api_key,
+        )
+    else:
+        return ChatOllama(
+            model=model or "qwen2.5-coder:7b-instruct-q4_K_M",
+            temperature=temperature,
+            num_ctx=8192,
+        )
 
 
 def run_agent_query(
     query: str,
     chat_history: list | None = None,
-    model: str = "qwen2.5-coder:7b-instruct-q4_K_M",
+    model: str = "",
 ) -> dict:
     """
     Run a query through intent-based routing and tool execution.

@@ -32,8 +32,16 @@ class QdrantManager:
         self,
         host: str = settings.qdrant_host,
         port: int = settings.qdrant_port,
+        url: str = settings.qdrant_url,
+        api_key: str = settings.qdrant_api_key,
     ):
-        self.client = QdrantClient(host=host, port=port)
+        # Cloud mode: use URL + API key
+        if url:
+            self.client = QdrantClient(url=url, api_key=api_key)
+            console.print(f"  [cyan]☁️  Qdrant Cloud: {url[:40]}...[/cyan]")
+        else:
+            # Local mode: use host + port
+            self.client = QdrantClient(host=host, port=port)
         self.vector_size = settings.embedding_dim
 
     # ── Collection Management ──

@@ -29,9 +29,16 @@ class Settings(BaseSettings):
     github_org: str = ""
     github_repos: str = ""  # comma-separated list
 
+    # ── LLM Provider ──
+    llm_provider: str = "ollama"  # "ollama" or "groq"
+    groq_api_key: str = ""
+    groq_model: str = "llama-3.1-8b-instant"
+
     # ── Qdrant ──
     qdrant_host: str = "localhost"
     qdrant_port: int = 6333
+    qdrant_url: str = ""       # Qdrant Cloud URL (e.g. https://xxx.cloud.qdrant.io)
+    qdrant_api_key: str = ""   # Qdrant Cloud API key
 
     # ── Organisation ──
     org_name: str = "My Organisation"

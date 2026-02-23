@@ -27,7 +27,7 @@ from app.components import (
 from app.chat_tab import render_chat
 from app.scorecard_ui import render_scorecard
 from codeguard.github_client import GitHubClient
-from codeguard.llm_client import OllamaClient
+from codeguard.llm_client import get_llm_client
 from codeguard.review_engine import ReviewEngine
 from config.settings import settings
 
@@ -108,19 +108,25 @@ with st.sidebar:
     # System Health
     st.subheader("🏥 System Health")
 
-    # Ollama status
-    ollama = OllamaClient()
-    ollama_healthy = ollama.is_healthy()
-    if ollama_healthy:
+    # LLM status (Ollama or Groq)
+    from codeguard.llm_client import get_llm_client
+    llm = get_llm_client()
+    llm_healthy = llm.is_healthy()
+    provider_name = "Groq" if llm.provider == "groq" else "Ollama"
+
+    if llm_healthy:
         st.markdown(
-            '<span class="status-badge status-healthy">● Ollama Online</span>',
+            f'<span class="status-badge status-healthy">● {provider_name} Online</span>',
             unsafe_allow_html=True,
         )
-        models = ollama.list_models()
-        st.caption(f"Models: {', '.join(models[:3])}")
+        if llm.provider == "groq":
+            st.caption(f"Model: {llm.model}")
+        else:
+            models = llm.list_models()
+            st.caption(f"Models: {', '.join(models[:3])}")
     else:
         st.markdown(
-            '<span class="status-badge status-unhealthy">● Ollama Offline</span>',
+            f'<span class="status-badge status-unhealthy">● {provider_name} Offline</span>',
             unsafe_allow_html=True,
         )
         st.caption("Run: `ollama serve`")
@@ -146,11 +152,18 @@ with st.sidebar:
 
     # Model selection
     st.subheader("🤖 Model")
-    model_name = st.text_input(
-        "Ollama Model",
-        value="qwen2.5-coder:7b-instruct-q4_K_M",
-        help="Model name as registered in Ollama",
-    )
+    if settings.llm_provider.lower() == "groq" or settings.groq_api_key:
+        model_name = st.text_input(
+            "Groq Model",
+            value=settings.groq_model,
+            help="Groq model name (e.g. llama-3.1-8b-instant)",
+        )
+    else:
+        model_name = st.text_input(
+            "Ollama Model",
+            value="qwen2.5-coder:7b-instruct-q4_K_M",
+            help="Model name as registered in Ollama",
+        )
 
     st.divider()
     st.caption("CodeGuard v0.1.0 · Local-First AI Reviews")
@@ -238,13 +251,11 @@ with tab_review:
                     st.rerun()
 
             if start_review:
-                if not ollama_healthy:
-                    st.error("❌ Ollama is not running. Start it with: `ollama serve`")
+                if not llm_healthy:
+                    st.error(f"❌ {provider_name} is not available. Check your configuration.")
                 else:
                     # Run the review with streaming
-                    engine = ReviewEngine(
-                        ollama_client=OllamaClient(model=model_name),
-                    )
+                    engine = ReviewEngine()
 
                     # Show progress stages
                     status_container = st.empty()

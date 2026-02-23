@@ -18,7 +18,7 @@ from typing import Generator, Optional
 from rich.console import Console
 
 from codeguard.github_client import GitHubClient
-from codeguard.llm_client import OllamaClient
+from codeguard.llm_client import get_llm_client, OllamaClient, GroqClient
 from codeguard.retriever import Retriever, ReviewContext
 from codeguard.scorecard import (
     SCORECARD_INSTRUCTION,
@@ -148,11 +148,11 @@ class ReviewEngine:
     def __init__(
         self,
         github_client: Optional[GitHubClient] = None,
-        ollama_client: Optional[OllamaClient] = None,
+        llm_client=None,
         retriever: Optional[Retriever] = None,
     ):
         self.github = github_client or GitHubClient()
-        self.llm = ollama_client or OllamaClient()
+        self.llm = llm_client or get_llm_client()
         self.retriever = retriever or Retriever()
 
     def review_pr(
